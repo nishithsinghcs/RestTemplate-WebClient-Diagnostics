@@ -1,11 +1,13 @@
-WebClient webClient = WebClient.builder()
-        .baseUrl("http://internal-service")
-        .build();
-
+WebClient webClient = WebClient.builder().baseUrl("http://service1").build();
 WebClientDiagnostics diagnostics = new WebClientDiagnostics(webClient);
 
-// Expect a String
-String responseStr = diagnostics.callWithDiagnostics("/api/data", String.class);
+// Call with tag for traceability
+ResponseWrapper<String> resp =
+        diagnostics.callWithDiagnostics("/api/data", String.class, "MS1");
 
-// Expect a DTO
-UserDto user = diagnostics.callWithDiagnostics("/api/user/42", UserDto.class);
+if (resp.isSuccess()) {
+    log.info("✅ [{}] Got response body={} in {}ms", resp.getTag(), resp.getBody(), resp.getExecutionTimeMs());
+} else {
+    log.warn("⚠️ [{}] Failed with status={} error={} time={}ms",
+             resp.getTag(), resp.getStatus(), resp.getErrorMessage(), resp.getExecutionTimeMs());
+}
