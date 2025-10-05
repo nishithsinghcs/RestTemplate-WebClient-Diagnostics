@@ -1,6 +1,7 @@
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.net.ConnectException;
@@ -17,38 +18,43 @@ public class WebClientDiagnostics {
         this.webClient = webClient;
     }
 
-    public String callWithDiagnostics(String url) {
+    // Generic version
+    public <T> T callWithDiagnostics(String url, Class<T> responseType) {
         try {
             return webClient.get()
                     .uri(url)
                     .retrieve()
-                    .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(5))  // Read timeout
+                    .bodyToMono(responseType)
+                    .timeout(Duration.ofSeconds(5)) // Read timeout
                     .onErrorResume(ex -> {
                         if (ex instanceof SocketTimeoutException) {
                             log.error("❌ Timeout: {}", ex.getMessage());
-                            return Mono.just("Timeout error");
+                            return Mono.empty();
                         }
                         if (ex instanceof ConnectException) {
                             log.error("❌ Connection refused: {}", ex.getMessage());
-                            return Mono.just("Connection refused");
+                            return Mono.empty();
                         }
                         if (ex instanceof UnknownHostException) {
                             log.error("❌ DNS Resolution failed: {}", ex.getMessage());
-                            return Mono.just("DNS resolution failure");
+                            return Mono.empty();
                         }
                         if (ex instanceof CallNotPermittedException) {
                             log.error("❌ Circuit breaker open: {}", ex.getMessage());
-                            return Mono.just("Circuit breaker open");
+                            return Mono.empty();
+                        }
+                        if (ex instanceof WebClientResponseException wcre) {
+                            log.error("❌ HTTP error: status={} body={}", wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                            return Mono.empty();
                         }
                         log.error("❌ Unexpected error: {}", ex.getMessage(), ex);
-                        return Mono.just("Unexpected error");
+                        return Mono.empty();
                     })
                     .block();
 
         } catch (Exception ex) {
             log.error("❌ Fatal error in WebClient diagnostics: {}", ex.getMessage(), ex);
-            return "Fatal error";
+            return null;
         }
     }
 }
