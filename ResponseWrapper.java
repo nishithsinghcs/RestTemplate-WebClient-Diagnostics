@@ -1,4 +1,4 @@
-package com.nishithsingh.diagnostics;
+package com.nishithsinghcs.diagnostics;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,8 +12,8 @@ public class ResponseWrapper<T> {
     private HttpStatus status;
     private T body;
     private String errorMessage;
+    private long executionTimeMs;
 
-    // Helpers
     public boolean isSuccess() {
         return status != null && status.is2xxSuccessful();
     }
