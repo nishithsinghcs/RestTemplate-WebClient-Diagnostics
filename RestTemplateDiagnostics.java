@@ -14,45 +14,40 @@ public class RestTemplateDiagnostics {
         this.restTemplate = restTemplate;
     }
 
-    public <T> T callWithDiagnostics(String url, Class<T> responseType) {
+    public <T> ResponseEntity<T> callWithDiagnostics(String url, Class<T> responseType) {
         try {
-            ResponseEntity<T> response = restTemplate.getForEntity(url, responseType);
-            return response.getBody();
+            return restTemplate.getForEntity(url, responseType);
 
         } catch (ResourceAccessException ex) {
             Throwable root = ex.getCause();
 
             if (root instanceof SocketTimeoutException) {
                 log.error("❌ Timeout: No response within configured time for URL={}", url);
-                return null;
-            }
-            if (root instanceof ConnectException) {
+            } else if (root instanceof ConnectException) {
                 log.error("❌ Connection refused: Target microservice not reachable for URL={}", url);
-                return null;
-            }
-            if (root instanceof UnknownHostException) {
+            } else if (root instanceof UnknownHostException) {
                 log.error("❌ DNS Resolution failed for host in URL={}", url);
-                return null;
+            } else {
+                log.error("❌ Resource access issue: {}", root != null ? root.getMessage() : ex.getMessage());
             }
 
-            log.error("❌ Resource access issue: {}", root != null ? root.getMessage() : ex.getMessage());
-            return null;
+            return ResponseEntity.internalServerError().build();
 
         } catch (HttpStatusCodeException ex) {
             log.error("❌ Server returned error: status={} body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return null;
+            return ResponseEntity.status(ex.getStatusCode()).build();
 
         } catch (CallNotPermittedException ex) {
             log.error("❌ Circuit Breaker is OPEN for URL={}", url);
-            return null;
+            return ResponseEntity.status(503).build(); // Service Unavailable
 
         } catch (HttpMessageConversionException ex) {
             log.error("❌ Serialization/Deserialization failed for URL={}", url, ex);
-            return null;
+            return ResponseEntity.internalServerError().build();
 
         } catch (Exception ex) {
             log.error("❌ Unexpected exception calling {}: {}", url, ex.getMessage(), ex);
-            return null;
+            return ResponseEntity.internalServerError().build();
         }
     }
 }
