@@ -13,6 +13,7 @@ public class ResponseWrapper<T> {
     private T body;
     private String errorMessage;
     private long executionTimeMs;
+    private String tag;   // NEW field for identifying microservice
 
     public boolean isSuccess() {
         return status != null && status.is2xxSuccessful();
