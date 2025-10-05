@@ -1,0 +1,11 @@
+WebClient webClient = WebClient.builder()
+        .baseUrl("http://internal-service")
+        .build();
+
+WebClientDiagnostics diagnostics = new WebClientDiagnostics(webClient);
+
+// Expect a String
+String responseStr = diagnostics.callWithDiagnostics("/api/data", String.class);
+
+// Expect a DTO
+UserDto user = diagnostics.callWithDiagnostics("/api/user/42", UserDto.class);
