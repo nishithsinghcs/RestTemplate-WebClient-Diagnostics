@@ -14,9 +14,9 @@ public class RestTemplateDiagnostics {
         this.restTemplate = restTemplate;
     }
 
-    public String callWithDiagnostics(String url) {
+    public <T> T callWithDiagnostics(String url, Class<T> responseType) {
         try {
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            ResponseEntity<T> response = restTemplate.getForEntity(url, responseType);
             return response.getBody();
 
         } catch (ResourceAccessException ex) {
@@ -24,35 +24,35 @@ public class RestTemplateDiagnostics {
 
             if (root instanceof SocketTimeoutException) {
                 log.error("❌ Timeout: No response within configured time for URL={}", url);
-                return "Timeout error";
+                return null;
             }
             if (root instanceof ConnectException) {
                 log.error("❌ Connection refused: Target microservice not reachable for URL={}", url);
-                return "Connection refused";
+                return null;
             }
             if (root instanceof UnknownHostException) {
                 log.error("❌ DNS Resolution failed for host in URL={}", url);
-                return "DNS resolution failure";
+                return null;
             }
 
             log.error("❌ Resource access issue: {}", root != null ? root.getMessage() : ex.getMessage());
-            return "Resource access error";
+            return null;
 
         } catch (HttpStatusCodeException ex) {
             log.error("❌ Server returned error: status={} body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return "Server error " + ex.getStatusCode();
+            return null;
 
         } catch (CallNotPermittedException ex) {
             log.error("❌ Circuit Breaker is OPEN for URL={}", url);
-            return "Circuit breaker open";
+            return null;
 
         } catch (HttpMessageConversionException ex) {
             log.error("❌ Serialization/Deserialization failed for URL={}", url, ex);
-            return "Serialization/Deserialization error";
+            return null;
 
         } catch (Exception ex) {
             log.error("❌ Unexpected exception calling {}: {}", url, ex.getMessage(), ex);
-            return "Unexpected error";
+            return null;
         }
     }
 }
