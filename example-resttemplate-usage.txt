@@ -4,7 +4,8 @@ ResponseWrapper<String> result =
         diagnostics.callWithDiagnostics("http://internal-service/api/data", String.class);
 
 if (result.isSuccess()) {
-    log.info("✅ Success with body: {}", result.getBody());
+    log.info("✅ Got body={} in {}ms", result.getBody(), result.getExecutionTimeMs());
 } else {
-    log.warn("⚠️ Failed with status={} and error={}", result.getStatus(), result.getErrorMessage());
+    log.warn("⚠️ Failed with status={} error={} time={}ms", 
+             result.getStatus(), result.getErrorMessage(), result.getExecutionTimeMs());
 }
