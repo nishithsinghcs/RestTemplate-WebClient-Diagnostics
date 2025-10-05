@@ -1,10 +1,10 @@
 RestTemplateDiagnostics diagnostics = new RestTemplateDiagnostics(restTemplate);
 
-// Expect full response
-ResponseEntity<String> response = diagnostics.callWithDiagnostics("http://internal-service/api/data", String.class);
+ResponseWrapper<String> result =
+        diagnostics.callWithDiagnostics("http://internal-service/api/data", String.class);
 
-if (response.getStatusCode().is2xxSuccessful()) {
-    log.info("✅ Body: {}", response.getBody());
+if (result.isSuccess()) {
+    log.info("✅ Success with body: {}", result.getBody());
 } else {
-    log.warn("⚠️ Failed with status: {}", response.getStatusCode());
+    log.warn("⚠️ Failed with status={} and error={}", result.getStatus(), result.getErrorMessage());
 }
