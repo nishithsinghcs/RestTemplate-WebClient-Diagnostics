@@ -1,0 +1,9 @@
+// RestTemplate version
+RestTemplate restTemplate = new RestTemplate();
+RestTemplateDiagnostics restDiag = new RestTemplateDiagnostics(restTemplate);
+String result1 = restDiag.callWithDiagnostics("http://internal-service/api/data");
+
+// WebClient version
+WebClient webClient = WebClient.builder().baseUrl("http://internal-service").build();
+WebClientDiagnostics webDiag = new WebClientDiagnostics(webClient);
+String result2 = webDiag.callWithDiagnostics("/api/data");
