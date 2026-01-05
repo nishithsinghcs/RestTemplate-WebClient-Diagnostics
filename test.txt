@@ -1,0 +1,170 @@
+
+-- ============================================
+-- PostgreSQL Reporting Module Schema Queries
+-- ============================================
+
+-- 1. Create Schemas
+CREATE SCHEMA IF NOT EXISTS core;
+CREATE SCHEMA IF NOT EXISTS reporting;
+CREATE SCHEMA IF NOT EXISTS analytics;
+
+-- ============================================
+-- 2. Core Tables
+-- ============================================
+
+CREATE TABLE core.tenant (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE core.app_user (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES core.tenant(id),
+    email TEXT NOT NULL,
+    display_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (tenant_id, email)
+);
+
+-- ============================================
+-- 3. Dataset Catalog
+-- ============================================
+
+CREATE TABLE reporting.dataset_catalog (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES core.tenant(id),
+    dataset_key TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    source_type TEXT CHECK (source_type IN ('TABLE','VIEW','SQL')),
+    schema_name TEXT NOT NULL,
+    source_name TEXT,
+    base_sql TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (tenant_id, dataset_key)
+);
+
+CREATE TABLE reporting.dataset_field (
+    id UUID PRIMARY KEY,
+    dataset_id UUID NOT NULL REFERENCES reporting.dataset_catalog(id) ON DELETE CASCADE,
+    field_key TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    data_type TEXT CHECK (data_type IN ('STRING','NUMBER','DATE','BOOLEAN','UUID')),
+    is_filterable BOOLEAN DEFAULT TRUE,
+    is_sortable BOOLEAN DEFAULT TRUE,
+    is_groupable BOOLEAN DEFAULT TRUE,
+    is_aggregatable BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (dataset_id, field_key)
+);
+
+-- ============================================
+-- 4. Report Definition
+-- ============================================
+
+CREATE TABLE reporting.report_definition (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES core.tenant(id),
+    dataset_id UUID NOT NULL REFERENCES reporting.dataset_catalog(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    query_mode TEXT DEFAULT 'BUILDER',
+    raw_sql TEXT,
+    is_shared BOOLEAN DEFAULT FALSE,
+    created_by UUID REFERENCES core.app_user(id),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE reporting.report_column (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id) ON DELETE CASCADE,
+    field_id UUID NOT NULL REFERENCES reporting.dataset_field(id),
+    display_order INT NOT NULL,
+    alias TEXT,
+    is_hidden BOOLEAN DEFAULT FALSE
+);
+
+-- ============================================
+-- 5. Filters, Sorting, Grouping
+-- ============================================
+
+CREATE TABLE reporting.report_filter (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id) ON DELETE CASCADE,
+    field_id UUID NOT NULL REFERENCES reporting.dataset_field(id),
+    operator TEXT,
+    value_json JSONB,
+    filter_order INT DEFAULT 0
+);
+
+CREATE TABLE reporting.report_sort (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id) ON DELETE CASCADE,
+    field_id UUID NOT NULL REFERENCES reporting.dataset_field(id),
+    direction TEXT CHECK (direction IN ('ASC','DESC')),
+    sort_order INT DEFAULT 0
+);
+
+CREATE TABLE reporting.report_group_by (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id) ON DELETE CASCADE,
+    field_id UUID NOT NULL REFERENCES reporting.dataset_field(id),
+    group_order INT DEFAULT 0
+);
+
+CREATE TABLE reporting.report_aggregation (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id) ON DELETE CASCADE,
+    field_id UUID NOT NULL REFERENCES reporting.dataset_field(id),
+    function TEXT CHECK (function IN ('SUM','AVG','COUNT','MIN','MAX')),
+    alias TEXT
+);
+
+-- ============================================
+-- 6. Permissions
+-- ============================================
+
+CREATE TABLE reporting.dataset_permission (
+    id UUID PRIMARY KEY,
+    dataset_id UUID NOT NULL REFERENCES reporting.dataset_catalog(id),
+    role_name TEXT NOT NULL,
+    can_read BOOLEAN DEFAULT TRUE,
+    can_export BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE reporting.report_permission (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id),
+    role_name TEXT NOT NULL,
+    can_view BOOLEAN DEFAULT TRUE,
+    can_edit BOOLEAN DEFAULT FALSE,
+    can_export BOOLEAN DEFAULT TRUE
+);
+
+-- ============================================
+-- 7. Audit Logging
+-- ============================================
+
+CREATE TABLE reporting.report_run_audit (
+    id UUID PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES reporting.report_definition(id),
+    executed_by UUID REFERENCES core.app_user(id),
+    executed_at TIMESTAMPTZ DEFAULT now(),
+    row_count INT,
+    execution_time_ms INT,
+    status TEXT,
+    error_message TEXT
+);
+
+-- ============================================
+-- 8. Indexes
+-- ============================================
+
+CREATE INDEX idx_dataset_tenant ON reporting.dataset_catalog(tenant_id);
+CREATE INDEX idx_report_tenant ON reporting.report_definition(tenant_id);
+CREATE INDEX idx_report_dataset ON reporting.report_definition(dataset_id);
+CREATE INDEX idx_audit_report ON reporting.report_run_audit(report_id);
+CREATE INDEX idx_audit_time ON reporting.report_run_audit(executed_at);
